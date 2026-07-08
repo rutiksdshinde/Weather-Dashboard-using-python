@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard - India</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .score-card {
+            transition: all 0.3s ease;
+        }
+        .score-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .gauge-container {
+            position: relative;
+            width: 120px;
+            height: 60px;
+            overflow: hidden;
+        }
+        .gauge-bg {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 12px solid #e5e7eb;
+            box-sizing: border-box;
+            top: 0;
+        }
+        .gauge-fill {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 12px solid transparent;
+            border-top-color: #22c55e;
+            box-sizing: border-box;
+            top: 0;
+            transition: transform 0.5s ease;
+        }
+        .score-value {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .weather-icon {
+            font-size: 3rem;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <span class="text-3xl">🌤️</span>
+                    <h1 class="text-2xl font-bold text-gray-900">Weather Dashboard</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="showPreferencesModal()" class="text-gray-600 hover:text-gray-900">
+                        <span class="text-xl">⭐</span> Saved Cities
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        <!-- Search Bar -->
+        <div class="mb-6">
+            <div class="flex max-w-2xl mx-auto">
+                <input 
+                    type="text" 
+                    id="citySearch" 
+                    placeholder="Search for a city in India..." 
+                    class="flex-1 px-4 py-3 rounded-l-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onkeypress="if(event.key==='Enter')searchCity()"
+                >
+                <button 
+                    onclick="searchCity()" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 transition"
+                >
+                    Search
+                </button>
+            </div>
+            <div id="searchSuggestions" class="max-w-2xl mx-auto mt-2 hidden">
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <ul id="suggestionsList" class="divide-y divide-gray-200"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="hidden text-center py-12">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-600">Fetching weather data...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden mb-6">
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                <span id="errorText"></span>
+            </div>
+        </div>
+
+        <!-- Weather Dashboard -->
+        <div id="weatherDashboard" class="hidden">
+            <!-- Current Weather Section -->
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <div class="flex flex-col md:flex-row items-center justify-between">
+                    <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                        <div class="weather-icon" id="weatherIcon">🌤️</div>
+                        <div>
+                            <h2 class="text-2xl font-bold" id="cityName">-</h2>
+                            <p class="text-gray-600" id="weatherDescription">-</p>
+                        </div>
+                    </div>
+                    <div class="text-center md:text-right">
+                        <div class="text-5xl font-bold" id="temperature">-°C</div>
+                        <p class="text-gray-600" id="feelsLike">Feels like -°C</p>
+                    </div>
+                </div>
+                
+                <!-- Weather Details Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">Humidity</p>
+                        <p class="text-xl font-semibold" id="humidity">-%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">Wind Speed</p>
+                        <p class="text-xl font-semibold" id="windSpeed">- km/h</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">Rain Chance</p>
+                        <p class="text-xl font-semibold" id="rainChance">-%</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">UV Index</p>
+                        <p class="text-xl font-semibold" id="uvIndex">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Scores Section -->
+            <h3 class="text-xl font-bold mb-4">Activity Scores</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8" id="scoresGrid">
+                <!-- Score cards will be inserted here -->
+            </div>
+
+            <!-- 5-Day Forecast -->
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold mb-4">5-Day Forecast</h3>
+                <div class="grid grid-cols-5 gap-2" id="forecastGrid">
+                    <!-- Forecast cards will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Historical Trends Chart -->
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-4">Score Trends (Last 7 Days)</h3>
+                <canvas id="trendChart" height="100"></canvas>
+            </div>
+        </div>
+
+        <!-- Quick Access Cities -->
+        <div class="mt-8">
+            <h3 class="text-lg font-bold mb-4">Popular Indian Cities</h3>
+            <div class="flex flex-wrap gap-2" id="quickCities">
+                <button onclick="loadCity('Mumbai')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Mumbai</button>
+                <button onclick="loadCity('Delhi')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Delhi</button>
+                <button onclick="loadCity('Bangalore')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Bangalore</button>
+                <button onclick="loadCity('Chennai')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Chennai</button>
+                <button onclick="loadCity('Kolkata')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Kolkata</button>
+                <button onclick="loadCity('Hyderabad')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Hyderabad</button>
+                <button onclick="loadCity('Pune')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Pune</button>
+                <button onclick="loadCity('Ahmedabad')" class="px-4 py-2 bg-white rounded-full shadow hover:shadow-md transition">Ahmedabad</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Preferences Modal -->
+    <div id="preferencesModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">Saved Cities</h2>
+                    <button onclick="closePreferencesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <!-- Add New City Form -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold mb-2">Add New City</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="newCityName" placeholder="City name" class="flex-1 px-3 py-2 border rounded">
+                        <button onclick="addNewPreference()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+                    </div>
+                </div>
+                
+                <!-- Saved Cities List -->
+                <div id="savedCitiesList" class="space-y-3">
+                    <p class="text-gray-500 text-center py-4">No saved cities yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        // State
+        let currentCity = null;
+        let trendChartInstance = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPreferences();
+        });
+
+        // Search functionality
+        let searchTimeout;
+        document.getElementById('citySearch').addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            if (query.length >= 2) {
+                searchTimeout = setTimeout(() => searchCitySuggestions(query), 300);
+            } else {
+                document.getElementById('searchSuggestions').classList.add('hidden');
+            }
+        });
+
+        async function searchCitySuggestions(query) {
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city_name: query })
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    showSearchSuggestions([data.data]);
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        function showSearchSuggestions(cities) {
+            const container = document.getElementById('searchSuggestions');
+            const list = document.getElementById('suggestionsList');
+            list.innerHTML = '';
+            
+            cities.forEach(city => {
+                const li = document.createElement('li');
+                li.className = 'px-4 py-3 hover:bg-gray-100 cursor-pointer';
+                li.innerHTML = `<div class="font-medium">${city.name}</div><div class="text-sm text-gray-500">${city.country || ''}</div>`;
+                li.onclick = () => {
+                    document.getElementById('citySearch').value = city.name;
+                    container.classList.add('hidden');
+                    loadWeather(city.latitude, city.longitude, city.name);
+                };
+                list.appendChild(li);
+            });
+            
+            container.classList.remove('hidden');
+        }
+
+        async function searchCity() {
+            const query = document.getElementById('citySearch').value.trim();
+            if (!query) return;
+            
+            document.getElementById('searchSuggestions').classList.add('hidden');
+            loadCity(query);
+        }
+
+        async function loadCity(cityName) {
+            showLoading();
+            hideError();
+            
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city_name: cityName })
+                });
+                
+                const data = await response.json();
+                if (data.success && data.data) {
+                    loadWeather(data.data.latitude, data.data.longitude, data.data.name);
+                } else {
+                    showError('City not found. Please try another name.');
+                }
+            } catch (error) {
+                showError('Failed to search city. Please try again.');
+            }
+        }
+
+        async function loadWeather(lat, lon, cityName) {
+            showLoading();
+            hideError();
+            currentCity = { lat, lon, name: cityName };
+            
+            try {
+                const response = await fetch('/api/weather', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitude: lat, longitude: lon, city_name: cityName })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    displayWeather(data.data);
+                } else {
+                    showError('Failed to fetch weather data.');
+                }
+            } catch (error) {
+                showError('Failed to fetch weather data. Please try again.');
+            }
+        }
+
+        function displayWeather(data) {
+            hideLoading();
+            const dashboard = document.getElementById('weatherDashboard');
+            dashboard.classList.remove('hidden');
+            dashboard.classList.add('fade-in');
+            
+            const weather = data.weather;
+            const scores = data.scores;
+            
+            // Update current weather
+            document.getElementById('cityName').textContent = data.city_name || 'Unknown City';
+            document.getElementById('temperature').textContent = `${Math.round(weather.current.temperature)}°C`;
+            document.getElementById('feelsLike').textContent = `Feels like ${Math.round(weather.current.feels_like)}°C`;
+            document.getElementById('weatherDescription').textContent = weather.weather_description || '';
+            document.getElementById('humidity').textContent = `${Math.round(weather.current.humidity)}%`;
+            document.getElementById('windSpeed').textContent = `${Math.round(weather.current.wind_speed)} km/h`;
+            document.getElementById('rainChance').textContent = `${Math.round(weather.rain_chance)}%`;
+            document.getElementById('uvIndex').textContent = weather.uv_index || '-';
+            
+            // Update weather icon based on description
+            const icon = getWeatherIcon(weather.current.weather_code);
+            document.getElementById('weatherIcon').textContent = icon;
+            
+            // Display scores
+            displayScores(scores);
+            
+            // Display forecast
+            displayForecast(weather.daily_forecasts);
+            
+            // Load historical data for trends
+            loadTrendData();
+        }
+
+        function displayScores(scores) {
+            const grid = document.getElementById('scoresGrid');
+            grid.innerHTML = '';
+            
+            const scoreItems = [
+                { key: 'laundry', name: 'Laundry', icon: '👕' },
+                { key: 'driving', name: 'Driving', icon: '🚗' },
+                { key: 'outdoor', name: 'Outdoor Activity', icon: '🌤️' },
+                { key: 'irrigation', name: 'Irrigation', icon: '💧' },
+                { key: 'power_risk', name: 'Power Cut Risk', icon: '⚡' }
+            ];
+            
+            scoreItems.forEach(item => {
+                const score = scores[item.key];
+                const card = document.createElement('div');
+                card.className = 'score-card bg-white rounded-xl shadow-md p-4';
+                
+                const color = score.color || '#6b7280';
+                const barWidth = score.score || 0;
+                
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-lg">${item.icon}</span>
+                        <span class="text-2xl font-bold" style="color: ${color}">${score.score}</span>
+                    </div>
+                    <h4 class="font-semibold text-gray-700">${item.name}</h4>
+                    <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                        <div class="h-2 rounded-full transition-all duration-500" style="width: ${barWidth}%; background-color: ${color}"></div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">${score.message || ''}</p>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function displayForecast(forecasts) {
+            const grid = document.getElementById('forecastGrid');
+            grid.innerHTML = '';
+            
+            if (!forecasts || forecasts.length === 0) return;
+            
+            forecasts.slice(0, 5).forEach(day => {
+                const date = new Date(day.date);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const icon = getWeatherIcon(day.weather_code);
+                
+                const card = document.createElement('div');
+                card.className = 'text-center p-3 bg-gray-50 rounded-lg';
+                card.innerHTML = `
+                    <p class="font-semibold text-sm">${dayName}</p>
+                    <span class="text-2xl my-2 block">${icon}</span>
+                    <p class="text-sm">${Math.round(day.temp_max)}° / ${Math.round(day.temp_min)}°</p>
+                    <p class="text-xs text-gray-500">🌧️ ${day.rain_chance}%</p>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function getWeatherIcon(code) {
+            const icons = {
+                0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+                45: '🌫️', 48: '🌫️',
+                51: '🌦️', 53: '🌦️', 55: '🌦️',
+                61: '🌧️', 63: '🌧️', 65: '🌧️',
+                71: '🌨️', 73: '🌨️', 75: '🌨️',
+                80: '🌦️', 81: '🌧️', 82: '⛈️',
+                95: '⛈️', 96: '⛈️', 99: '⛈️'
+            };
+            return icons[code] || '🌤️';
+        }
+
+        async function loadTrendData() {
+            // For demo purposes, generate some sample trend data
+            // In production, this would fetch from /api/history/{preference_id}
+            const labels = [];
+            const laundryData = [];
+            const drivingData = [];
+            const outdoorData = [];
+            const powerRiskData = [];
+            
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+                
+                // Generate sample data (replace with actual API call)
+                laundryData.push(Math.floor(Math.random() * 40) + 50);
+                drivingData.push(Math.floor(Math.random() * 30) + 60);
+                outdoorData.push(Math.floor(Math.random() * 50) + 40);
+                powerRiskData.push(Math.floor(Math.random() * 50) + 10);
+            }
+            
+            renderTrendChart(labels, laundryData, drivingData, outdoorData, powerRiskData);
+        }
+
+        function renderTrendChart(labels, laundry, driving, outdoor, powerRisk) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            if (trendChartInstance) {
+                trendChartInstance.destroy();
+            }
+            
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Laundry Score',
+                            data: laundry,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Driving Score',
+                            data: driving,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Outdoor Score',
+                            data: outdoor,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Power Risk',
+                            data: powerRisk,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Score (0-100)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Preferences Management
+        async function loadPreferences() {
+            try {
+                const response = await fetch('/api/preferences');
+                const data = await response.json();
+                if (data.success) {
+                    displayPreferences(data.data);
+                }
+            } catch (error) {
+                console.error('Failed to load preferences:', error);
+            }
+        }
+
+        function displayPreferences(preferences) {
+            const list = document.getElementById('savedCitiesList');
+            
+            if (preferences.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 text-center py-4">No saved cities yet.</p>';
+                return;
+            }
+            
+            list.innerHTML = '';
+            preferences.forEach(pref => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+                div.innerHTML = `
+                    <div>
+                        <span class="font-medium">${pref.city_name}</span>
+                        ${pref.is_primary ? '<span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Primary</span>' : ''}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="loadPreferenceWeather(${pref.id})" class="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                        <button onclick="deletePreference(${pref.id})" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        async function addNewPreference() {
+            const cityName = document.getElementById('newCityName').value.trim();
+            if (!cityName) return;
+            
+            try {
+                // First search for the city
+                const searchResponse = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city_name: cityName })
+                });
+                
+                const searchData = await searchResponse.json();
+                if (!searchData.success) {
+                    showToast('City not found');
+                    return;
+                }
+                
+                // Create preference
+                const response = await fetch('/api/preferences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        city_name: searchData.data.name,
+                        latitude: searchData.data.latitude,
+                        longitude: searchData.data.longitude,
+                        country: searchData.data.country,
+                        is_primary: false
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showToast('City saved successfully!');
+                    document.getElementById('newCityName').value = '';
+                    loadPreferences();
+                }
+            } catch (error) {
+                showToast('Failed to save city');
+            }
+        }
+
+        async function deletePreference(id) {
+            if (!confirm('Are you sure you want to delete this city?')) return;
+            
+            try {
+                await fetch(`/api/preferences/${id}`, { method: 'DELETE' });
+                showToast('City deleted');
+                loadPreferences();
+            } catch (error) {
+                showToast('Failed to delete city');
+            }
+        }
+
+        async function loadPreferenceWeather(id) {
+            try {
+                const response = await fetch(`/api/preferences/${id}/weather`);
+                const data = await response.json();
+                if (data.success) {
+                    closePreferencesModal();
+                    displayWeather(data.data);
+                }
+            } catch (error) {
+                showToast('Failed to load weather');
+            }
+        }
+
+        // Modal controls
+        function showPreferencesModal() {
+            document.getElementById('preferencesModal').classList.remove('hidden');
+            document.getElementById('preferencesModal').classList.add('flex');
+            loadPreferences();
+        }
+
+        function closePreferencesModal() {
+            document.getElementById('preferencesModal').classList.add('hidden');
+            document.getElementById('preferencesModal').classList.remove('flex');
+        }
+
+        // Utility functions
+        function showLoading() {
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+            document.getElementById('weatherDashboard').classList.add('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.getElementById('errorMessage').classList.remove('hidden');
+            document.getElementById('errorText').textContent = message;
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Close modal on outside click
+        document.getElementById('preferencesModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePreferencesModal();
+            }
+        });
+    </script>
+</body>
+</html>
