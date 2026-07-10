@@ -3,7 +3,7 @@
 A comprehensive weather dashboard with activity scoring specifically designed for Indian users. This application goes beyond basic weather information by providing actionable insights for daily activities based on weather conditions.
 
 ## Links
-- **Portfolio:** https://prismatic-alpaca-376b6f.netlify.app
+- **Portfolio:** https://rutikshinde.netlify.app/
 - **LinkedIn:** https://www.linkedin.com/in/rutik-shinde-09a438237
 - **GitHub:** https://github.com/rutiksdshinde
 
